@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Random Redirect</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 2rem; }
+    .card { max-width: 560px; border: 1px solid #ddd; border-radius: 12px; padding: 24px; }
+    .row { margin-top: 12px; }
+    .btn { display:inline-block; padding:12px 18px; border:1px solid #333; border-radius:8px; text-decoration:none; }
+  </style>
+  <script>
+    // ── 設定の取得と分岐 ───────────────────────────────────────────
+    async function main() {
+      const slug = extractSlug();
+      if (!slug) return show("Slug が指定されていません（/go/<slug>）");
+
+      const conf = await loadConfig(slug);
+      if (!conf) return; // エラーメッセージは loadConfig 内で表示
+
+      if (conf.enabled === false) return show("このリンクは現在停止中です。");
+
+      // 年齢同意（初回のみ）
+      if (conf.ageGate) {
+        const ok = await ensureAgeConsent(slug);
+        if (!ok) return show("アクセスがキャンセルされました。");
+      }
+
+      const urls = Array.isArray(conf.urls) ? conf.urls : [];
+      if (!urls.length) return show("遷移先URLが設定されていません。");
+
+      const dest = pickRandom(urls);
+
+      // モード切替（既定は auto）
+      const mode = (conf.mode || "auto").toLowerCase();
+      if (mode === "click") {
+        // 中間ページ（ユーザーの明示クリックで遷移）
+        showClickGate(dest, slug);
+      } else {
+        // 自動リダイレクト
+        location.replace(dest);
+      }
+    }
+
+    // ── ヘルパー ─────────────────────────────────────────────────
+    function extractSlug() {
+      // /go/abc → "abc"
+      const m = location.pathname.replace(/\/+$/, "").match(/\/go\/([^\/?#]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    async function loadConfig(slug) {
+      try {
+        const res = await fetch("/config.json", { cache: "no-store" });
+        if (!res.ok) throw new Error("fetch failed");
+        const all = await res.json();
+        const conf = all[slug];
+        if (!conf) { show(`未定義のスラッグです：${slug}`); return null; }
+        return conf;
+      } catch (e) {
+        show("設定ファイルを読み込めませんでした。");
+        return null;
+      }
+    }
+
+    function pickRandom(arr) {
+      const i = Math.floor(Math.random() * arr.length);
+      return arr[i];
+    }
+
+    function show(html) {
+      const el = document.getElementById("app");
+      el.innerHTML = (html || "") + "";
+    }
+
+    function showClickGate(dest, slug) {
+      const safeDest = dest;
+      show(`
+        <div class="card">
+          <h2>この先に進むにはボタンをクリックしてください</h2>
+          <div class="row">スラッグ：<code>${escapeHtml(slug)}</code></div>
+          <div class="row">
+            <a class="btn" id="goBtn" href="#">進む</a>
+          </div>
+        </div>
+      `);
+      // クリック計測が必要ならここにロギング処理を挿入（後日Functionsで拡張）
+      document.getElementById("goBtn").addEventListener("click", (e) => {
+        e.preventDefault();
+        // ASP側の「クリック判定」を尊重して replace ではなく href 遷移
+        location.href = safeDest;
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // 年齢同意（localStorageに保持）
+    async function ensureAgeConsent(slug) {
+      const KEY = `age-ok`; // 案件横断で共有／案件別にしたい場合は `age-ok:${slug}`
+      try {
+        const v = localStorage.getItem(KEY);
+        if (v === "1") return true;
+      } catch (_) {}
+
+      // 専用の軽いダイアログ
+      return new Promise((resolve) => {
+        show(`
+          <div class="card">
+            <h2>年齢確認</h2>
+            <p>この先には成人向けコンテンツが含まれる可能性があります。18歳以上ですか？</p>
+            <div class="row">
+              <a id="yes" class="btn" href="#">はい（18歳以上）</a>
+              <a id="no"  class="btn" href="#" style="margin-left:8px;">いいえ</a>
+            </div>
+          </div>
+        `);
+        document.getElementById("yes").addEventListener("click", (e) => {
+          e.preventDefault();
+          try { localStorage.setItem(KEY, "1"); } catch (_) {}
+          resolve(true);
+        });
+        document.getElementById("no").addEventListener("click", (e) => {
+          e.preventDefault();
+          resolve(false);
+        });
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", main);
+  </script>
+</head>
+<body>
+  <div id="app">loading…</div>
+</body>
+</html>

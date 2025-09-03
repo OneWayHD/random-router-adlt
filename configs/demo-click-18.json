@@ -1,0 +1,11 @@
+{
+    "enabled": true,
+    "mode": "click",
+    "ageGate": true,
+    "urls": [
+      "https://example.com/adult-offer1",
+      "https://example.com/adult-offer2",
+      "https://example.com/adult-offer3"
+    ]
+  }
+  
