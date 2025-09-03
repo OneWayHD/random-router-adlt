@@ -1,0 +1,18 @@
+/configs/*
+  Cache-Control: no-store
+
+/*
+  # 参照元の秘匿（/go/<slug> を漏らさない）
+  Referrer-Policy: strict-origin-when-cross-origin
+  # 検索避け（公開したい場合は行ごと削除）
+  X-Robots-Tag: noindex, nofollow
+  # クリックジャッキング対策
+  X-Frame-Options: DENY
+  # MIMEスニッフィング防止
+  X-Content-Type-Options: nosniff
+  # 常時HTTPS（HSTS）
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  # ブラウザ機能制限（不要なら外す）
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  # CSP（最低限・静的構成前提）
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src * data: blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'
